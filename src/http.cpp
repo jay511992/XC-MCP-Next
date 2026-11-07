@@ -1,6 +1,7 @@
 #include "http.hpp"
 #include "instance.hpp"
 #include "plug_abi.h"
+#include "mcp_log.hpp"
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -91,6 +92,7 @@ bool sendAll(SOCKET s, const char* data, int len) {
 
 void sendResponse(SOCKET s, int code, const char* text, const std::string& body,
                   bool jsonBody, bool keepAlive) {
+    mcp_log::respond(code, body.size());
     char head[640];
     int len = sprintf_s(head, sizeof(head),
         "HTTP/1.1 %d %s\r\n"
@@ -200,6 +202,8 @@ bool readRequest(Server& server, SOCKET s, std::string& buf, Request& rq) {
 }
 
 void handleRequest(Server& server, SOCKET s, const Request& rq, bool& closeConn) {
+    std::string path = rq.target.substr(0, rq.target.find('?'));
+    mcp_log::begin(rq.method, path, rq.body.size());
     closeConn = true;
     if (rq.headers.has("origin")) {
         sendResponse(s, 403, "Forbidden", "forbidden: request carries an Origin header", false, false);
@@ -211,20 +215,13 @@ void handleRequest(Server& server, SOCKET s, const Request& rq, bool& closeConn)
         sendResponse(s, 403, "Forbidden", "forbidden: Host header not allowed", false, false);
         return;
     }
-    std::string token = rq.headers.get("x-xc-token");
-    if (token.empty()) {
-        std::string auth = rq.headers.get("authorization");
-        if (auth.size() > 7 && _strnicmp(auth.c_str(), "Bearer ", 7) == 0) token = trim(auth.substr(7));
-    }
-    if (server.identity.token.empty() || token != server.identity.token) {
-        sendResponse(s, 401, "Unauthorized", "unauthorized: missing or bad token", false, false);
-        return;
-    }
+    // Token authentication is disabled by design. Legacy X-XC-Token and
+    // Authorization headers are accepted but ignored; loopback binding, Host,
+    // Origin, instance ID and project guards remain enforced.
     if (rq.headers.has("x-xc-instance") && rq.headers.get("x-xc-instance") != server.identity.id) {
         sendResponse(s, 409, "Conflict", "target IDE instance changed; explicitly reconnect to select a new instance", false, false);
         return;
     }
-    std::string path = rq.target.substr(0, rq.target.find('?'));
     if (path != "/mcp" && path != "/health") {
         sendResponse(s, 404, "Not Found", "not found", false, false);
         return;
@@ -478,13 +475,15 @@ bool start(int preferredPort, Handler handler) {
         }
         arg.release();
         g_current = server;
-        xi::logLine(L"http: listening on http://127.0.0.1:%d/mcp, instance=%hs (token auth ON)",
+        xi::logLine(L"http: listening on http://127.0.0.1:%d/mcp, instance=%hs (no token auth)",
                     actual, server->identity.id.c_str());
+        mcp_log::notice("MCP service started on http://127.0.0.1:" + std::to_string(actual) + "/mcp");
         return true;
     } catch (const std::exception& error) {
         if (server) { server->identity.unpublish(); server->listener = INVALID_SOCKET; }
         if (listener != INVALID_SOCKET) closesocket(listener);
         xi::logLine(L"http: start failed: %hs", error.what());
+        mcp_log::notice("MCP service start failed: " + std::string(error.what()));
         return false;
     }
 }
@@ -493,7 +492,10 @@ void stop(bool fromHandler) {
     if (fromHandler) {
         std::lock_guard<std::mutex> lock(g_lifecycle);
         Server* server = g_requestServer ? g_requestServer : g_current.get();
-        if (server) stopListening(*server);
+        if (server) {
+            mcp_log::notice("MCP service stop requested for instance " + server->identity.id);
+            stopListening(*server);
+        }
         return;  // Own response must be sent before its socket closes.
     }
     std::lock_guard<std::mutex> finalStop(g_finalStop);

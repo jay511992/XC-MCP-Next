@@ -159,9 +159,9 @@ class LiveTests(unittest.TestCase):
             self.assertEqual(json.loads(res.read())["id"], 9)
             res.close()
 
-    def test_auth_origin_and_host(self):
+    def test_token_optional_origin_and_host(self):
         for headers, expected in [({"Origin": ""}, 403), ({"Origin": "http://example.test"}, 403),
-                                  ({"Host": "evil.test:18766"}, 403), ({"X-XC-Token": "bad-token"}, 401),
+                                  ({"Host": "evil.test:18766"}, 403), ({"X-XC-Token": "bad-token"}, 200),
                                   ({"X-XC-Token": "", "Authorization": "Bearer " + bridge._read_token()}, 200)]:
             with self.subTest(headers=list(headers), expected=expected):
                 conn = http.client.HTTPConnection("127.0.0.1", 18766, timeout=20)

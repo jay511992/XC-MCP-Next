@@ -163,10 +163,9 @@
 1. 基线：用 `_attic/src.bak-perf-<时间戳>/` 的源码重建 DLL（改 `build.bat` 里的
    `IDEROOT` 指向 `I:\xcide` 即可）。
 2. 部署某个 DLL 到 `I:\xcide\data\plug\plug_xcmcp.dll`，重启炫彩IDE。
-3. 就绪判定：`/health` 与 `/mcp` **都需要** `X-XC-Token`
-   （`%LOCALAPPDATA%\xc-mcp\token`）。仓库里的 `wait_ready.py`、`xcbuild.py`、
-   `bridge/stdio_bridge.py` 现已统一按「`XC_MCP_TOKEN` 环境变量 → token 文件」读取并带头发送，
-   401 时会重读 token 再试一次。
+3. 就绪判定：1.1.0 及更早版本 `/health` 与 `/mcp` 需要 `X-XC-Token`
+   （`%LOCALAPPDATA%\xc-mcp\token`）；**1.2.0 起 token 认证已取消**，无需 token 头。
+   兼容工具仍可能读取并发送旧 token，仅用于旧端点；新服务会忽略。
 4. 测量：对每个工具「ping → 工具 → ping」，用 `工具 − (ping1+ping2)/2` 作为净成本。
 
 ## 7. 第二轮（opt2）：keep-alive、模块扫描缓存、健壮性

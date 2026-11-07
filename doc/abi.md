@@ -136,7 +136,7 @@ jmp  rax
 原因：此时 IDE 的窗格与桥接尚未就绪。
 
 实测：初始化后延迟 5 秒再调用，全部接口正常。
-推荐的正确做法是注册 `bindEvent` 回调，在 `event_type_createView`（事件号 11）里做窗格相关工作。
+推荐的正确做法是注册 `bindEvent` 回调，在 `event_type_createView`（事件号 11）里做窗格相关工作。当前 x64 `Data` 布局实测：`v[0]` 为 `hMainFrame`，`v[1]` 为返回给宿主的 `arrayPanes[0]`，不要覆盖 `v[0]`；旧 AI 示例中按 10 创建窗格会误入 UI 属性事件。
 
 ## 5. XCGUI 桥接
 
@@ -677,6 +677,8 @@ open(p, "wb").write(b"\xef\xbb\xbf" + t.replace("\n", "\r\n").encode("utf-8"))
 `xc_get_output` 的 `clear=true` 分支原先调 `XEdit_SetText(h, L"")`。该 API 在本 IDE 上会「在文件开头多插一个字符」并直接写盘（曾把 `main.xc` 从 13925 B 改成 13926 B、首行变成 `s动态数组<文本型>`）。现已删除该调用，固定返回 `cleared:false`，并在带 `clear` 时回一条 `clearNote` 说明禁用原因。
 
 ### 18.7 R1 鉴权（token + Origin + Host + CORS 收紧 + Content-Type）
+
+> **1.2.0 起 superseded**：token 认证已取消；旧 `X-XC-Token`/`Authorization` 头仅为兼容并被忽略，tokenFile 也仅保留为兼容元数据。以下内容记录 1.1.0 及更早版本的历史实现。
 
 `http.cpp` 7,740 → 13,239 字符。实现要点：
 

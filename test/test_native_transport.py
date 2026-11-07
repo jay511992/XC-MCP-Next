@@ -36,6 +36,7 @@ def build_host(out):
     command += ["/I" + str(p) for p in includes]
     command += [str(ROOT / "test" / "native_transport_host.cpp")]
     command += [str(ROOT / "src" / p) for p in ("json.cpp", "instance.cpp", "http.cpp", "mcp.cpp")]
+    command += [str(ROOT / "test" / "native_log_stub.cpp")]
     command += ["/Fe:" + str(exe), "/link"] + ["/LIBPATH:" + str(p) for p in libraries]
     command += ["kernel32.lib", "user32.lib", "ws2_32.lib"]
     env = dict(os.environ, TEMP=str(out), TMP=str(out), TMPDIR=str(out))
@@ -54,7 +55,8 @@ class NativeHost:
         self.project = str(root / (name + "项目") / (name + ".xcproj"))
         self.state.write_text(self.project, encoding="utf-8")
         env = dict(os.environ, LOCALAPPDATA=str(root / "local"),
-                   XC_MCP_INSTANCE_DIR=str(root / "instances"), TEMP=str(root), TMP=str(root))
+                   XC_MCP_INSTANCE_DIR=str(root / "instances"), TEMP=str(root), TMP=str(root),
+                   XCMCP_NATIVE_LOG=str(root / (name + "-transport.log")))
         for key, value in (("XC_MCP_PORT", port), ("XC_MCP_TOKEN", token), ("XCMCP_TEST_GATE", gate)):
             env.pop(key, None)
             if value is not None:
@@ -274,11 +276,12 @@ class NativeTransportTests(unittest.TestCase):
         for bad in ("%FF", "%00", "%zz", "relative.xcproj", ""):
             self.assertEqual(h.rpc(headers={"X-XC-Project": bad})[0], 409)
 
-    def test_auth_host_origin_and_bearer(self):
+    def test_token_is_optional_but_host_and_origin_guards_remain(self):
         h = self.host()
         for token in (None, "wrong", h.token.lower()):
-            self.assertEqual(h.request(headers={"X-XC-Token": token})[0], 401)
+            self.assertEqual(h.request(headers={"X-XC-Token": token})[0], 200)
         self.assertEqual(h.request(headers={"X-XC-Token": None, "Authorization": "Bearer " + h.token})[0], 200)
+        self.assertEqual(h.request(headers={"X-XC-Token": None, "Authorization": None})[0], 200)
         for origin in ("", "http://evil.example"):
             self.assertEqual(h.request(headers={"Origin": origin})[0], 403)
         for host in ("", "evil.example", "127.0.0.1:1"):
@@ -392,6 +395,31 @@ class NativeTransportTests(unittest.TestCase):
                 conn.close()
             self.assertEqual(pending.result(timeout=5)[0], 200)
         h.command("status")
+
+
+    def test_transport_log_has_metadata_but_never_secrets_or_bodies(self):
+        h = self.host()
+        status, _ = h.rpc("tools/call", {"name": "xc_get_project", "arguments": {
+            "path": "C:\\TOP_SECRET_SOURCE.xc", "token": "TOP_SECRET_ARGUMENT"}}, rid=7)
+        self.assertEqual(status, 200)
+        status, _ = h.request("POST", "/mcp?token=DO_NOT_LOG_QUERY", json.dumps({
+            "jsonrpc": "2.0", "id": 8, "method": "ping"}))
+        self.assertEqual(status, 200)
+        self.assertEqual(h.rpc("notifications/initialized", rid=None)[0], 202)
+        status, _ = h.request("POST", "/mcp", json.dumps({"jsonrpc": "2.0", "id": {
+            "token": "DO_NOT_LOG_NESTED_ID"}, "method": "ping"}))
+        self.assertEqual(status, 200)
+        self.assertEqual(h.request(headers={"X-XC-Token": None,
+                                            "Authorization": "Bearer DO_NOT_LOG_AUTH"})[0], 200)
+        self.assertEqual(h.rpc("tools/call", {"name": "test_throw"})[0], 500)
+        h.command("status")
+        log = (self.root / "A-transport.log").read_text(encoding="utf-8")
+        for expected in ("tools/call id=7 tool=xc_get_project", "ping id=8", "id=invalid-id",
+                         "notifications/initialized id=notification", "HTTP 200", "HTTP 500"):
+            self.assertIn(expected, log)
+        for forbidden in (h.token, "TOP_SECRET_ARGUMENT", "TOP_SECRET_SOURCE.xc",
+                          "DO_NOT_LOG_QUERY", "DO_NOT_LOG_AUTH", "Authorization", h.project):
+            self.assertNotIn(forbidden, log)
 
 
 if __name__ == "__main__":

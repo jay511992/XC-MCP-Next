@@ -1,6 +1,7 @@
 #include "mcp.hpp"
 #include "json.hpp"
 #include "tools.hpp"
+#include "mcp_log.hpp"
 #include "plug_abi.h"
 
 #include <string>
@@ -12,7 +13,7 @@ namespace {
 
 const char* kProtocolVersion = "2024-11-05";
 const char* kServerName = "xcide-mcp";
-const char* kServerVersion = "1.1.0";
+const char* kServerVersion = "1.2.0";
 
 bool validUtf8(const std::string& in) {
     size_t i = 0;
@@ -97,6 +98,7 @@ std::string resultEnvelope(const js::Value& id, const js::Value& result) {
 
 std::string errorEnvelope(const js::Value& id, int code, const std::string& message) {
     js::Value err = js::Value::obj();
+    mcp_log::outcome("JSON-RPC error " + std::to_string(code));
     err.set("code", code);
     err.set("message", message);
     js::Value v = js::Value::obj();
@@ -144,6 +146,7 @@ std::string doToolsCall(const js::Value& id, const js::Value& params) {
     bool isError = false;
     std::string out = tools::call(name, args, isError);
     out = sanitizeUtf8(std::move(out));
+    mcp_log::outcome(isError ? "tool error" : "tool result");
 
     js::Value r = js::Value::obj();
     r.set("content", textContent(std::move(out)));
@@ -160,6 +163,7 @@ std::string handle(const std::string& requestBody) {
     std::string perr;
     if (!js::parse(requestBody, req, &perr)) {
         js::Value nul;
+        mcp_log::outcome("invalid JSON");
         return errorEnvelope(nul, -32700, std::string("Parse error: ") + perr);
     }
 
@@ -198,7 +202,6 @@ std::string handleOne(const js::Value& req) {
         return errorEnvelope(id, -32600, "Invalid Request: missing method");
     }
     std::string method = pm->asStr();
-
     js::Value idv;
     const js::Value* pid = req.find("id");
     bool hasId = (pid != nullptr);
@@ -207,6 +210,11 @@ std::string handleOne(const js::Value& req) {
     js::Value emptyParams = js::Value::obj();
     const js::Value* pp = req.find("params");
     const js::Value& params = (pp && pp->isObj()) ? *pp : emptyParams;
+    const js::Value* toolName = method == "tools/call" ? params.find("name") : nullptr;
+    const std::string logId = !hasId ? std::string() :
+                              (idv.isObj() || idv.isArr() ? std::string("invalid-id") : idv.dump());
+    mcp_log::rpc(method, logId,
+                 toolName && toolName->isStr() ? toolName->asStr() : std::string());
 
     if (method == "initialize") {
         return resultEnvelope(idv, buildInitialize());

@@ -127,8 +127,8 @@ class Acceptance:
     def raw(self, target, method="GET", path="/health", body=None, headers=None, conn=None):
         own = conn is None
         conn = conn or http.client.HTTPConnection("127.0.0.1", target.info["port"], timeout=10)
-        h = {"X-XC-Token": instances.read_token(target.info["tokenFile"]),
-             "X-XC-Instance": target.instance_id, "X-XC-Project": quote(target.project, safe=""),
+        # Token auth is disabled: do not send X-XC-Token in live acceptance.
+        h = {"X-XC-Instance": target.instance_id, "X-XC-Project": quote(target.project, safe=""),
              "Content-Type": "application/json"}
         for key, value in (headers or {}).items():
             if value is None:
@@ -172,7 +172,7 @@ class Acceptance:
             assert read["bom"] and read["crlf"] > 0
             assert "MCP_ISOLATED_" + name in read["content"]
             for token in (None, "incorrect-token"):
-                assert self.raw(target, headers={"X-XC-Token": token})[0] == 401
+                assert self.raw(target, headers={"X-XC-Token": token})[0] == 200
             for origin in ("", "http://untrusted.invalid"):
                 assert self.raw(target, headers={"Origin": origin})[0] == 403
             assert self.raw(target, headers={"Host": "untrusted.invalid"})[0] == 403
@@ -181,7 +181,8 @@ class Acceptance:
             assert self.raw(target, headers={"X-XC-Project": quote(other.project, safe="")})[0] == 409
         assert schemas[0] == schemas[1]
         self.check("protocol_29_tools_parameters_and_file_reads", detail="initialize / notification / 29 schemas / status / project / BOM+CRLF")
-        self.check("auth_and_target_guards_on_both_instances", detail="401 bad/missing token; 403 Host/Origin; 409 wrong instance/project")
+        self.check("token_optional_and_target_guards_on_both_instances",
+                   detail="200 without/with bad token; 403 Host/Origin; 409 wrong instance/project")
         found = instances.discover(self.directory)
         assert {t.instance_id for t in found} == {a.instance_id, b.instance_id}
         for target in (a, b):

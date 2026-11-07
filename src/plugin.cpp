@@ -1,6 +1,7 @@
 #include "plug_abi.h"
 #include "http.hpp"
 #include "mcp.hpp"
+#include "mcp_log.hpp"
 #include "tools.hpp"
 
 #include <windows.h>
@@ -19,7 +20,7 @@ namespace {
 
 const int kPort = 18766;
 
-// UTF-8 -> UTF-16（token 本身是纯 ASCII hex，这里只做通用转换）。
+// UTF-8 -> UTF-16（实例 ID 为 ASCII，这里只做通用转换）。
 std::wstring widen(const std::string& s) {
     if (s.empty()) return std::wstring();
     int n = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0);
@@ -60,19 +61,14 @@ DWORD WINAPI bootThread(LPVOID) {
         addLine(L"[XC-MCP-Next] MCP 服务启动失败(端口可能被占用)，详见 xc_mcp_next.log");
     }
 
-    // 把当前生效的 token 打到调试输出窗口，方便直接复制到 agent 的 mcp 配置里。
-    std::string tok = http::token();
-    if (!tok.empty()) {
-        std::wstring line = L"[XC-MCP-Next] Token (header X-XC-Token): ";
-        line += widen(tok);
-        addLine(line);
-    }
+    mcp_log::notice(started ? "MCP output pane is active" : "MCP output pane: service start failed");
     return 0;
 }
 
 BOOL initEntry(void* funSet, HWND hMainFrame, int ver, int rsv, const wchar_t* entry) {
     xi::g_funSet     = (xi::FunSet)funSet;
     xi::g_hMainFrame = hMainFrame;
+    mcp_log::install();
     xi::g_ver        = ver;
     xi::logLine(L"==== %s funSet=%p hMain=%p ver=%d rsv=%d ====",
                 entry, funSet, hMainFrame, ver, rsv);
@@ -91,12 +87,14 @@ extern "C" __declspec(dllexport) BOOL OnPlugInit(void* funSet, HWND hMainFrame, 
 }
 
 extern "C" __declspec(dllexport) BOOL OnExitPlug() {
+    mcp_log::shutdown();
     http::stop();
     xi::logLine(L"OnExitPlug");
     return TRUE;
 }
 
 extern "C" __declspec(dllexport) BOOL OnPlugExit() {
+    mcp_log::shutdown();
     http::stop();
     xi::logLine(L"OnPlugExit");
     return TRUE;

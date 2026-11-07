@@ -11,9 +11,9 @@
 - `instanceId` 由 PID 和进程创建时间组成。同一进程内稳定，IDE 重启后变化，避免 PID 复用造成误认。
 - `xc_status` / `xc_server status` 提供实际 `port`、`pid`、`instanceId`；启动横幅也显示实际地址和 ID。
 
-每个实例在 `%LOCALAPPDATA%\xc-mcp\instances` 发布 `<instanceId>.json` 和 `<instanceId>.token`。可通过 `XC_MCP_INSTANCE_DIR` 把登记目录改到指定位置；IDE 与客户端必须使用同一个目录。
+每个实例在 `%LOCALAPPDATA%\xc-mcp\instances` 发布 `<instanceId>.json` 和 `<instanceId>.token`。**MCP 已取消 token 认证**；`.token` 仅为旧客户端兼容保留，服务器不校验。可通过 `XC_MCP_INSTANCE_DIR` 把登记目录改到指定位置；IDE 与客户端必须使用同一个目录。
 
-登记文件只是发现入口，客户端会用带鉴权的 `GET /health` 核验 ID、PID、创建时间、exe 和地址，并取得**实时工程信息**。崩溃残留、损坏或无法认证的记录不算存活实例，不根据文件名猜测目标。
+登记文件只是发现入口，客户端用 `GET /health` 核验 ID、PID、创建时间、exe 和地址，并取得**实时工程信息**。崩溃残留、损坏或身份不符的记录不算存活实例，不根据文件名猜测目标。
 
 ## 2. 发现与明确选择
 
@@ -25,7 +25,7 @@ python -I -B bridge\instances.py resolve --project 'C:\work\项目A\项目A.xcpr
 python -I -B bridge\instances.py resolve --instance '<从 list 取得的 ID>' --json
 ```
 
-输出含 `instanceId`、`pid`、`startedAt`、`url`、`port`、`ideExe`、`hwnd`、`projectFile`、`projectDir`、`projectName`、`tokenFile`，不输出 token 原文。`hwnd` 是经过进程归属核验的 **Win32 HWND**，不是 XCGUI 的内部 HWINDOW。
+输出含 `instanceId`、`pid`、`startedAt`、`url`、`port`、`ideExe`、`hwnd`、`projectFile`、`projectDir`、`projectName`、`tokenFile`。`tokenFile` 是兼容字段，连接不需要它。`hwnd` 是经过进程归属核验的 **Win32 HWND**，不是 XCGUI 的内部 HWINDOW。
 
 选择规则：
 
@@ -43,7 +43,7 @@ python -I -B bridge\instances.py resolve --instance '<从 list 取得的 ID>' --
 
 ## 3. stdio 接入（多实例推荐）
 
-每个客户端独立启动自己的桥接进程，不共享同一对 stdin/stdout。桥接会发现地址和读取实例 token，无需在配置里保存明文 token。
+每个客户端独立启动自己的桥接进程，不共享同一对 stdin/stdout。桥接会发现地址和实例身份；连接不要求 token，无需配置任何凭据。
 
 以下两个工程路径是示例，替换为实际 `.xcproj` 完整路径：
 
@@ -72,11 +72,11 @@ python -I -B bridge\instances.py resolve --instance '<从 list 取得的 ID>' --
 
 也可将 `--project` 换成 `--instance`，或两者同时指定。`mcp.json` 提供的是“只有一个存活实例时自动连接”的简洁配置，多实例时请按上面拆分连接并增加选择器。
 
-桥接在第一次请求时绑定；之后不自动更换实例。IDE 重启后，即使仍打开同一个工程，也需要在客户端重新建立 MCP 连接/重启桥接进程。这是防误操作设计，不是 token 自动刷新失败。401 只会在**原目标地址**重读 token 后再试一次；409 或断线不会转发到另一 IDE。
+桥接在第一次请求时绑定；之后不自动更换实例。IDE 重启后，即使仍打开同一个工程，也需要在客户端重新建立 MCP 连接/重启桥接进程。这是防误操作设计。旧端点若仍返回 401，桥接兼容性地在原目标重读一次 token；新服务器不要求 token。409 或断线不会转发到另一 IDE。
 
 ## 4. HTTP 直连
 
-先执行 `list` 或 `resolve`，将各自的 `url` 和 `tokenFile` 配置给客户端。以下端口、ID、token 均为示意，不能假设自动分配的第二个端口是 18767：
+先执行 `list` 或 `resolve`，将各自的 `url` 配置给客户端；token 不需要配置。以下端口和 ID 均为示意，不能假设自动分配的第二个端口是 18767：
 
 ```json
 {
@@ -85,7 +85,6 @@ python -I -B bridge\instances.py resolve --instance '<从 list 取得的 ID>' --
       "type": "http",
       "url": "http://127.0.0.1:18766/mcp",
       "headers": {
-        "X-XC-Token": "<读取 A 的 tokenFile 内容>",
         "X-XC-Instance": "<A 的 instanceId>"
       }
     },
@@ -93,7 +92,6 @@ python -I -B bridge\instances.py resolve --instance '<从 list 取得的 ID>' --
       "type": "http",
       "url": "http://127.0.0.1:18767/mcp",
       "headers": {
-        "X-XC-Token": "<读取 B 的 tokenFile 内容>",
         "X-XC-Instance": "<B 的 instanceId>"
       }
     }
@@ -109,7 +107,7 @@ python -c "import urllib.parse; print(urllib.parse.quote(r'C:\work\项目A\项�
 
 将输出作为 `X-XC-Project` 头值。服务器执行前校验，工具响应前再次校验，健康信息也按快照校验；不匹配返回 409。仅填写 URL 的旧 HTTP 配置仍可用，但不会自动获得项目保护，建议带上身份/工程头或改用 stdio。
 
-传输仍是无会话的 JSON HTTP MCP，协议版本 `2024-11-05`：`POST /mcp` 返回 JSON，通知返回 202 空正文；不提供 GET SSE 推送流，`GET /mcp` 返回 405。`GET /health` 返回鉴权后的实例元数据。
+传输仍是无会话的 JSON HTTP MCP，协议版本 `2024-11-05`：`POST /mcp` 返回 JSON，通知返回 202 空正文；不提供 GET SSE 推送流，`GET /mcp` 返回 405。`GET /health` 返回无需 token 的实时实例元数据；Host/Origin 和可选目标头仍生效。
 
 ## 5. 等待与定向编译
 
@@ -131,7 +129,7 @@ python -I -B xcbuild\xcbuild.py build --project 'C:\work\项目A\项目A.xcproj'
 
 编译仍通过 IDE 的原生翻译器和 F7 完成，没有改造编译器或修补 IDE exe。一个进程生命周期内重复 F7 的“跳过编译”限制仍存在，所以 xcbuild 需要定向重启。
 
-## 6. 环境变量与鉴权
+## 6. 环境变量与安全边界
 
 | 变量 | 使用方 / 含义 |
 | --- | --- |
@@ -140,18 +138,14 @@ python -I -B xcbuild\xcbuild.py build --project 'C:\work\项目A\项目A.xcproj'
 | `XC_MCP_PROJECT` | 客户端：工程完整路径选择器 |
 | `XC_MCP_INSTANCE` | 客户端：实例 ID 选择器 |
 | `XC_MCP_URL` | 客户端：显式本机 HTTP 地址；继续支持无登记的旧服务 |
-| `XC_MCP_TOKEN` | IDE / 客户端：优先使用指定 token |
+| `XC_MCP_TOKEN` | 兼容字段，服务器不校验；可省略 |
 | `XC_IDE_ROOT` | xcbuild：安装目录，含 `炫彩IDE.exe` |
 
-服务端默认复用 `%LOCALAPPDATA%\xc-mcp\token`，首次创建采用原子发布，不会因另一 IDE 启动而覆盖有效 token。每个实例的 `.token` 文件保存该实例实际使用的凭据。客户端每次按以下顺序读取：
+MCP 服务**不需要 token**。兼容工具仍会读取 `XC_MCP_TOKEN`、所选实例 `tokenFile` 或旧 `%LOCALAPPDATA%\xc-mcp\token` 并发送 `X-XC-Token`，但当前服务器忽略这些头，不会因此返回 401。旧客户端无需修改即可继续连接；新客户端可完全省略 token。
 
-1. `XC_MCP_TOKEN`；
-2. 所选实例的 `tokenFile`；
-3. 兼容的 `%LOCALAPPDATA%\xc-mcp\token`。
+非法 Host 或任何 Origin 头返回 403；目标实例/工程不匹配返回 409。Python 客户端只连接字面量回环地址，不走系统代理，不跟随重定向。旧服务若没有可验证身份，显式 URL 仍可做旧式调用，但 xcbuild 拒绝管理其进程。
 
-缺失/错误 token 返回 401，非法 Host 或任何 Origin 头返回 403。Python 客户端只连接字面量回环地址，不走系统代理，不跟随重定向。旧服务若没有可验证身份，显式 URL 仍可做旧式调用，但 xcbuild 拒绝管理其进程。
-
-这不是多用户权限隔离或文件系统沙箱：同用户可读取 token；原工具的路径白名单和显式 `allowOutsideProject` 行为不变。所有待管理 IDE 都应升级插件，未升级实例不参与新登记发现。不要将端口暴露到局域网/公网，也不要在工作过程中手动切换正在编译的目标工程。
+这不是多用户权限隔离或文件系统沙箱，也**不再有身份认证**：任何能访问本机回环端口的同机进程都可调用 MCP；原工具的路径白名单和显式 `allowOutsideProject` 行为不变。所有待管理 IDE 都应升级插件，未升级实例不参与新登记发现。不要将端口暴露到局域网/公网，也不要在工作过程中手动切换正在编译的目标工程。
 
 ## 7. 测试与复现
 
@@ -184,6 +178,6 @@ python -I -B test\test_native_transport.py
 python -I -B test\test_multi_ide_live.py --fixture '<测试根>\fixture.json' --baseline '<升级前 tools/list 数组文件>' --build
 ```
 
-`--build` 明确允许定向重启、编译隔离工程 A。该脚本向 A 的测试源码添加注释，检查 B 不变，执行 HTTP/stdio 各两客户端、每客户端 50 次查询、鉴权/目标头、等待隔离与编译清理；报告写入 fixture 内的 `verification-live.json`。不提供 `--build` 时不重启/编译，但仍执行隔离测试文件写入。
+`--build` 明确允许定向重启、编译隔离工程 A。该脚本向 A 的测试源码添加注释，检查 B 不变，执行 HTTP/stdio 各两客户端、每客户端 50 次查询、无 token/错误 token 放行、目标头校验、等待隔离与编译清理；报告写入 fixture 内的 `verification-live.json`。不提供 `--build` 时不重启/编译，但仍执行隔离测试文件写入。
 
 本轮结果和未执行项目见 [验收记录](MULTI_INSTANCE_VERIFICATION.md)。不要直接运行带业务工程硬编码路径或批量 `taskkill /IM` 的历史脚本。

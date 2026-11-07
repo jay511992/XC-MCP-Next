@@ -1,11 +1,34 @@
 #pragma once
 
+#ifndef XWM_WINDPROC
+#define XWM_WINDPROC (0x7000 + 2)
+#endif
+enum layout_size_ {
+    layout_size_fixed = 0, layout_size_fill, layout_size_auto,
+    layout_size_weight, layout_size_percent, layout_size_disable
+};
 #include <windows.h>
 
 typedef void* HELE;
 typedef void* HWINDOW;
 
 extern "C" {
+HELE __stdcall XPane_Create(const wchar_t* pName, int width, int height, HWINDOW hFrameWnd);
+void __stdcall XPane_SetView(HELE hPane, HELE hView);
+void __stdcall XPane_ShowPane(HELE hPane, BOOL activate);
+BOOL __stdcall XPane_IsShowPane(HELE hPane);
+HELE __stdcall XEdit_Create(int x, int y, int width, int height, HELE hParent);
+void __stdcall XEdit_EnableMultiLine(HELE hEle, BOOL enable);
+void __stdcall XEdit_EnableReadOnly(HELE hEle, BOOL enable);
+void __stdcall XEdit_EnableAutoWrap(HELE hEle, BOOL enable);
+void __stdcall XEdit_MoveEnd(HELE hEle);
+BOOL __stdcall XEdit_DeleteRow(HELE hEle, int row);
+void __stdcall XWidget_LayoutItem_SetWidth(HELE hObject, layout_size_ type, int width);
+void __stdcall XWidget_LayoutItem_SetHeight(HELE hObject, layout_size_ type, int height);
+void __stdcall XWidget_SetID(HELE hObject, int id);
+BOOL __stdcall XWnd_RegEventC(HWINDOW hWindow, int event, void* callback);
+BOOL __stdcall XWnd_RemoveEventC(HWINDOW hWindow, int event, void* callback);
+BOOL __stdcall XC_PostMessage(HWINDOW hWindow, UINT message, WPARAM wParam, LPARAM lParam);
 
 HWND __stdcall XWnd_GetHWND(HWINDOW hWindow);
 

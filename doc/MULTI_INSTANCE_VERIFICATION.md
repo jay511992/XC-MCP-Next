@@ -2,6 +2,8 @@
 
 日期：2026-11-07。对应已批准目标：`.pi/goal/支持多-ide-实例的本机-mcp-20261107-1323.md`。
 
+> **后续变更（1.2.0）**：token 认证已取消。下文第 6 项及“原生测试”中关于 401/token 的陈述保留为 1.1.0 历史记录；当前行为见末尾“取消 token 认证（1.2.0）”一节。
+
 ## 结论与逐项证据
 
 | 合同项 | 结果 | 本轮观察到的证据 |
@@ -18,7 +20,8 @@
 
 ## 构建产物
 
-- 产物：`out/plug_xcmcp.dll`，x64，MCP server version `1.1.0`。
+- 1.1.0 历史产物：`out/plug_xcmcp.dll`，x64，MCP server version `1.1.0`。
+- 当前 1.2.0 产物见文末更新记录。
 - 授权部署：`I:\xcide\data\plug\plug_xcmcp.dll`。
 - 最终构建/部署 SHA-256：
 
@@ -102,3 +105,16 @@ cde51211e21f4534ec98dd3ed2675a88cda0bf271a3876051c97030bf0e7f1eb
 - 工具声明函数与源码基线一致；编译诊断函数/正则 AST 与基线一致；原 `test_opt2.py` 内容与基线逐字节一致。
 - 再次核对 `out/plug_xcmcp.dll` 与授权部署 DLL，均为上文最终 SHA-256。
 - 本项目未改写任何客户端的全局 MCP 配置；多实例接入需由使用方按指南指定工程或实例。
+
+## 取消 token 认证（1.2.0）
+
+变更后 `http.cpp` 不再解析或校验 `X-XC-Token` / `Authorization`；实例 token 文件仅为旧客户端兼容元数据。Host、Origin、实例 ID、工程保护未变。
+
+本轮实际执行：
+
+- `build.bat` 成功；原生 HTTP/MCP 测试 **15/15**、客户端测试 **47/47**、旧离线回归 **4/4** 通过。
+- 原生测试明确验证：无 token、错误 token、旧 Bearer 头均返回 **200**；带 Origin/非法 Host 返回 **403**；错误实例/工程仍返回 **409**。
+- 部署 `out/plug_xcmcp.dll` 到 `I:\xcide\data\plug\`，两者 SHA-256 均为 `946d88910d22ac62152ae5ed73b82a796d0c943850b4490166073037483e67c1`。
+- 用无 token 的 HTTP 请求验证原工程实例：`/health`、`initialize`（serverInfo version `1.2.0`）及 `tools/call xc_status` 均 **200**；`toolCount=29`、`mcpLogPane=true`、`mcpLogVisible=true`。
+- 同一实例的错误 token 和 `Authorization: Bearer wrong-token` 均为 **200**；`Origin`/非法 Host 为 **403**；错误实例/工程为 **409**。
+- 验证实例 PID `33040`、instanceId `33040-01dd6ea27aee6f6f`、临时端口 `21442`；该进程是本次验证实例，工具调用结束后未作为常驻服务保留。部署 DLL 已保留。

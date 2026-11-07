@@ -3,9 +3,11 @@
 炫彩IDE 插件，对齐原 `plug_mcp.dll`（471,040 B，无源码）的 24 个 `xc_*` MCP 工具，并扩展至 **29 个**（新增 5 个模块管理工具，让 AI 能自己发现/加入/新建模块）。
 本工程通过实证逆向 IDE 插件 ABI 后从零实现。
 
-## 多 IDE 实例（1.1.0）
+## 多 IDE 实例（1.2.0）
 
 支持多个 IDE 进程分别对接客户端：独立端口、实例发现、按工程完整路径或实例 ID 绑定，HTTP 与 stdio 均可用，29 个工具及既有参数保持兼容。
+
+本机 HTTP **不要求 token 认证**。客户端可直接连接发现到的 `url`；旧 `X-XC-Token`、`Authorization` 头和 `tokenFile` 仅为兼容保留，服务器不校验。Host、Origin、实例 ID 与工程保护仍然生效。
 
 ```powershell
 python -I -B bridge\instances.py list --json
@@ -37,12 +39,11 @@ python "$MCP" call xc_ide xc_get_output tailLines=6
 ```json
 "xc_ide": {
   "transport": "http",
-  "url": "http://127.0.0.1:18766/mcp",
-  "headers": { "X-XC-Token": "${file:%LOCALAPPDATA%\\xc-mcp\\token}" }
+  "url": "http://127.0.0.1:18766/mcp"
 }
 ```
 
-`${file:...}` / `${env:...}` 由 `mcp.py` 在发请求前展开，token 不进 `servers.json` 明文。
+无需 token 头。已存在的旧 `X-XC-Token` 配置可以保留，但会被服务器忽略。
 
 > 注意：Windows 控制台是 GBK，直接看输出里的中文会乱码。加 `PYTHONIOENCODING=utf-8` 或用管道接到 UTF-8 读取即可，数据本身没问题。
 
@@ -51,11 +52,7 @@ python "$MCP" call xc_ide xc_get_output tailLines=6
 在 DSH 设置里把该连接的工具暴露打开，重启后即可直接调用 `mcp__xc-ide__xc_*`。
 代价是每轮多约 3.4k token。
 
-该连接同样要带 token（`custom-xc-ide`）：
-
-```json
-{ "headers": { "X-XC-Token": "<读取所选实例 tokenFile 的内容>" } }
-```
+该连接不需要 token。旧配置若仍带 `X-XC-Token` 头，可继续使用但不会被校验。
 
 ### 前置条件
 
@@ -147,14 +144,13 @@ python I:\xcide\xc-plugin\XC-MCP-Next\wait_ready.py
   "mcpServers": {
     "xc-ide": {
       "type": "http",
-      "url": "http://127.0.0.1:18766/mcp",
-      "headers": { "X-XC-Token": "<token 文件内容>" }
+      "url": "http://127.0.0.1:18766/mcp"
     }
   }
 }
 ```
 
-默认 token 兼容 `%LOCALAPPDATA%\xc-mcp\token`，也可按实例枚举结果的 `tokenFile` 读取。缺失或错误 token 返回 401；建议同时配置 `X-XC-Instance`，项目保护头详见多实例指南。
+无需 token；缺失、错误或旧 token 都不会返回 401。多实例时建议配置 `X-XC-Instance`，项目保护头详见多实例指南。
 
 本工程 `mcp.json` 改为自动发现唯一实例的 stdio 配置，多实例时增加明确选择器。
 
@@ -175,7 +171,7 @@ Claude Desktop / Cursor 等只吃 stdio 的客户端，用 `bridge/stdio_bridge.
 ```
 
 桥接已实测：`initialize` / `tools/list`（29 个工具）/ `tools/call` 三项全通。
-桥接每次现读 token：`XC_MCP_TOKEN` 优先，其次选中实例的 tokenFile，最后兼容旧 token 文件；401 只对原目标重读重试一次。
+桥接可读取旧 token 文件作兼容，但服务器不要求 token；不带 token 也能直接连接。
 首次请求后固定绑定实例。IDE 重启/目标失效后需重新建立 MCP 连接，不自动改连别的 IDE；按工程选择时，工程切换会被拒绝。
 没有实例或匹配不唯一时返回明确错误，请用 `--project` / `--instance` 选择。
 
@@ -400,22 +396,11 @@ python "$MCP" call xc_ide xc_module_search "query=线程" "limit=50"
 
 ## 安全边界
 
-每个 IDE 进程启动独立的本机回环 HTTP 服务，默认首选 18766、占用时分配空闲端口。token、Host、Origin 与目标身份校验均启用。
+每个 IDE 进程启动独立的本机回环 HTTP 服务，默认首选 18766、占用时分配空闲端口。**token 认证已取消**；Host、Origin 与目标身份校验仍启用。
 
 ### 鉴权
 
-默认复用 `%LOCALAPPDATA%\xc-mcp\token`；首次安全创建采用原子发布，不会因另一实例启动而覆盖有效 token。每个实例还发布自己的 tokenFile。请求必须带其一：
-
-| 头 | 值 |
-| --- | --- |
-| `X-XC-Token` | token 原文 |
-| `Authorization` | `Bearer <token>` |
-
-也可用环境变量 `XC_MCP_TOKEN` 覆盖（优先于 token 文件）。取 token：
-
-```bash
-type "%LOCALAPPDATA%\xc-mcp\token"
-```
+本机 MCP 不再要求 token。`X-XC-Token`、`Authorization: Bearer`、`XC_MCP_TOKEN` 和实例 `tokenFile` 仅为旧客户端兼容，服务器不读取、不比较。不要依赖它们进行访问控制。
 
 ### 请求校验
 
@@ -425,16 +410,15 @@ HTTP 帧在进入请求处理前检查：头部过大返回 431，错误/重复 
 | --- | --- |
 | 带 `Origin` 头（任何值，含空值） | **403** |
 | `Host` 不是当前端口的 `127.0.0.1:<port>` / `localhost:<port>` | **403** |
-| token 缺失或不匹配 | **401** |
 | `X-XC-Instance` 不匹配 | **409**，不执行请求 |
 | `X-XC-Project` 与当前工程/健康快照不匹配 | **409** |
 | POST 的 `Content-Type` 不含 `application/json` | **415** |
 
-`OPTIONS` 同样要求鉴权和目标校验。`POST /mcp` 返回 JSON，通知返回 202 空正文；`GET /health` 返回实时身份和工程信息。无 GET SSE 推送流，`GET /mcp` 返回 405。
+`OPTIONS` 同样执行目标校验。`POST /mcp` 返回 JSON，通知返回 202 空正文；`GET /health` 返回实时身份和工程信息。无 GET SSE 推送流，`GET /mcp` 返回 405。
 
 响应头不再发 `Access-Control-Allow-Origin`（原先的 `*` 通配已删除），改发 `X-Content-Type-Options: nosniff` 与 `Cache-Control: no-store`。
 
-> 因为 `Origin` 一律拒绝，**浏览器里的网页无法调用**这些工具；`GET /health` 同样要求 token。
+> 因为 `Origin` 一律拒绝，**浏览器里的网页无法调用**这些工具；`GET /health` 无 token 要求，但仍校验 Origin、Host 和可选目标头。
 
 ### 路径白名单
 
@@ -462,7 +446,7 @@ HTTP 帧在进入请求处理前检查：头部过大返回 431，错误/重复 
 
 ### 仍有残余风险
 
-- token 文件对同用户任意进程可读，**同用户下不构成安全边界**（防的是浏览器与跨用户）。
+- **没有 token 认证**：任何能访问本机回环端口的同机进程都可调用 MCP；安全边界依赖回环绑定、Origin/Host 拒绝和显式目标头，而不是身份认证。
 - `xc_probe_cmd` 的 `allow_unsafe=true` + `confirm` 一旦给出，即可调任意 ABI 分支（含会写宿主内存的分支），调用方需自行判断。
 - 服务固定绑定回环，不要把端口改成 `0.0.0.0`。
 
@@ -475,5 +459,5 @@ HTTP 帧在进入请求处理前检查：头部过大返回 431，错误/重复 
 - **`xc_build` 在同一 IDE 生命周期内可能只有首次真实编译**，之后返回「跳过编译」。历史绕过尝试未能可靠复位标志；未修改 IDE 二进制。连续编译使用 `xcbuild` 的目标 PID 定向重启。
 - 编译测试未发现额外源码回写，不等于可以丢弃用户编辑。定向关闭遇到保存对话框会停止，不强杀。
 - 解析计数器偏移 `+0x4B83EC` 是 3.3.9 硬编码值，换版本会失效（写前有 PE 边界 + `VirtualQuery` 门禁，不匹配时拒绝写入而不是崩）。
-- 旧 token 头、显式 `XC_MCP_URL` / `XC_MCP_TOKEN` 保持兼容；多实例请更新连接选择器。本项目不自动修改全局 MCP 配置。
+- 旧 token 头、显式 `XC_MCP_URL` / `XC_MCP_TOKEN` 可继续提交但被忽略；多实例请更新连接选择器。本项目不自动修改全局 MCP 配置。
 - JSON-RPC 的 **batch 请求**已支持（顶层数组，逐条处理，通知项跳过不产出响应）；孤立代理字符在响应文本里会被替换成 U+FFFD，保证输出是合法 UTF-8。

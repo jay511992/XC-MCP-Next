@@ -2,6 +2,7 @@
 #include "plug_abi.h"
 #include "xcgui_min.h"
 #include "http.hpp"
+#include "mcp_log.hpp"
 
 #include <windows.h>
 #include <string>
@@ -348,7 +349,7 @@ static std::string doStatus() {
     js::Value v = js::Value::obj();
     putBool(v, "ok", true);
     putStr(v, "server", "xc-mcp-next");
-    putStr(v, "version", "1.1.0");
+    putStr(v, "version", "1.2.0");
     putInt(v, "ver", g_ver);
     putNum(v, "funSet", (double)(uintptr_t)g_funSet);
     putNum(v, "hMainFrame", (double)(uintptr_t)g_hMainFrame);
@@ -357,6 +358,16 @@ static std::string doStatus() {
     putInt(v, "pid", (int)GetCurrentProcessId());
     putBool(v, "httpRunning", http::running());
     putInt(v, "toolCount", toolCount());
+    {
+        mcp_log::Stats log = mcp_log::stats();
+        putBool(v, "mcpLogPane", log.pane);
+        putBool(v, "mcpLogVisible", log.visible);
+        putInt(v, "mcpLogRows", log.rows);
+        putInt(v, "mcpLogPending", (int)log.pending);
+        putNum(v, "mcpLogExchanges", (double)log.exchanges);
+        putNum(v, "mcpLogLines", (double)log.lines);
+        putNum(v, "mcpLogDropped", (double)log.dropped);
+    }
     putStr(v, "abi", "3.3.9");
     putStr(v, "pluginDir", ownDir());
     putStr(v, "ideImage", ideImageTag());

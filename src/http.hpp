@@ -15,6 +15,8 @@ void stop(bool fromHandler = false);
 bool running();
 int port();
 std::string instanceId();
+// Legacy compatibility metadata only; token authentication is disabled and this
+// value is never compared with request headers.
 std::string token();
 
 }

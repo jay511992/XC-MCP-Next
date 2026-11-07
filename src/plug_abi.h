@@ -34,6 +34,10 @@ constexpr int SET_TASK_STRING        = 19;
 constexpr int SET_TASK_PLUG          = 20;
 constexpr int SET_TASK_PLUG_STRING   = 21;
 
+// Current 3.3.9 create-view event. The older AI sample's enum maps 10 to a UI
+// property event; do not use that stale numeric value for pane creation.
+constexpr int EVENT_CREATE_VIEW      = 11;
+
 constexpr int PANE_FILEVIEW          = 1001;
 constexpr int PANE_OUTPUT_DEBUG      = 1012;
 constexpr int PANE_OUTPUT_DEBUG_EDIT = 1101;

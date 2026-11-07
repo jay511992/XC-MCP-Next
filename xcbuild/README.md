@@ -18,7 +18,7 @@ $env:XC_IDE_ROOT = 'I:\xcide'
 python -I -B bridge\instances.py list --json
 ```
 
-多实例规则、HTTP/stdio 配置、token 及登记目录详见 [多实例接入](../doc/MULTI_INSTANCE.md)。
+多实例规则、HTTP/stdio 配置、登记目录及免 token 行为详见 [多实例接入](../doc/MULTI_INSTANCE.md)。
 
 ## 用法
 

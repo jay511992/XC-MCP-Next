@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "xc-ide": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["I:\\xcide\\xc-plugin\\XC-MCP-Next\\bridge\\stdio_bridge.py"]
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "label": "base",
+  "token": "15c3a539...",
+  "results": {
+    "tools/list": {
+      "raw_ms": 0.7169,
+      "net_ms": 0.0425,
+      "n": 60
+    },
+    "xc_status": {
+      "raw_ms": 0.4621,
+      "net_ms": 0.0217,
+      "n": 60
+    },
+    "xc_get_project": {
+      "raw_ms": 0.4635,
+      "net_ms": 0.0208,
+      "n": 60
+    },
+    "xc_read_file": {
+      "raw_ms": 0.8548,
+      "net_ms": 0.3381,
+      "n": 60
+    },
+    "xc_get_output": {
+      "raw_ms": 0.5482,
+      "net_ms": 0.0993,
+      "n": 60
+    },
+    "xc_module_list": {
+      "raw_ms": 52.58,
+      "net_ms": 51.892,
+      "n": 20
+    },
+    "xc_module_search": {
+      "raw_ms": 49.6646,
+      "net_ms": 49.0937,
+      "n": 20
+    },
+    "keepalive_ping": {
+      "median_ms": 0.4404,
+      "p90_ms": 0.7326,
+      "n": 200
+    },
+    "keepalive_tools_list": {
+      "median_ms": 0.5072,
+      "p90_ms": 11.2687,
+      "n": 200
+    }
+  }
+}

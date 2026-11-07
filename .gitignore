@@ -1,0 +1,65 @@
+# Local session state, archived backups, and build output
+/.pi/
+/_attic/
+/out/
+/Temp/
+
+# Python caches, virtual environments, and local tool state
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.venv/
+venv/
+.vs/
+*.py[cod]
+
+# Compiled binaries and intermediate files
+# Import libraries under lib/ are retained as required build dependencies.
+*.dll
+*.exe
+*.obj
+*.exp
+*.pdb
+*.ilk
+*.o
+*.a
+*.so
+*.dylib
+*.pyd
+*.pch
+*.idb
+*.tlog
+
+# Temporary files and logs
+*.tmp
+*.log
+*.bak*
+*.swp
+*.swo
+
+# Local credentials and private keys (never commit real tokens)
+.env
+.env.*
+token
+token.*
+tokens
+tokens.*
+credentials
+credentials.*
+secrets
+secrets.*
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini

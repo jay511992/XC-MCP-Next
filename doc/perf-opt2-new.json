@@ -1,0 +1,51 @@
+{
+  "label": "new",
+  "token": "15c3a539...",
+  "results": {
+    "tools/list": {
+      "raw_ms": 0.4987,
+      "net_ms": 0.0469,
+      "n": 60
+    },
+    "xc_status": {
+      "raw_ms": 0.4554,
+      "net_ms": 0.0151,
+      "n": 60
+    },
+    "xc_get_project": {
+      "raw_ms": 0.4495,
+      "net_ms": -0.0014,
+      "n": 60
+    },
+    "xc_read_file": {
+      "raw_ms": 0.8099,
+      "net_ms": 0.3206,
+      "n": 60
+    },
+    "xc_get_output": {
+      "raw_ms": 0.5583,
+      "net_ms": 0.0847,
+      "n": 60
+    },
+    "xc_module_list": {
+      "raw_ms": 16.9478,
+      "net_ms": 15.9291,
+      "n": 20
+    },
+    "xc_module_search": {
+      "raw_ms": 16.8271,
+      "net_ms": 14.6928,
+      "n": 20
+    },
+    "keepalive_ping": {
+      "median_ms": 0.1337,
+      "p90_ms": 0.2561,
+      "n": 200
+    },
+    "keepalive_tools_list": {
+      "median_ms": 0.2189,
+      "p90_ms": 0.3747,
+      "n": 200
+    }
+  }
+}

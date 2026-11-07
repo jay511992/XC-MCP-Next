@@ -1,0 +1,55 @@
+file	api	binding	purpose
+src/plug_abi.h	xi::FunSet	funSet	IDE 注入的 ABI 函数指针类型
+src/plug_abi.h	xi::Data	plug_data_	ABI 调用数据块，type@+0 id@+4 出参从+8起
+src/plug_abi.h	xi::call	-	调用 funSet，返回 IDE 原始返回值（恒为0）
+src/plug_abi.h	xi::getHele	SET_GET_HELE	按窗格ID取 XCGUI 元素句柄
+src/plug_abi.h	xi::debugAddString	SET_DEBUG_ADDSTRING	向 [调试输出] 窗格追加一行
+src/plug_abi.h	xi::getProjectRaw	SET_GET_PROJECT	取工程名/工程文件/工程目录三个指针
+src/plug_abi.h	xi::logLine	-	写插件日志 xc_mcp_next.log
+src/http.hpp	http::start	-	启动内置 HTTP 服务
+src/http.hpp	http::stop	-	停止服务
+src/mcp.hpp	mcp::handle	-	处理一条 JSON-RPC 请求
+src/tools.hpp	tools::list	-	返回 29 个工具的 schema
+src/tools.hpp	tools::call	-	分发工具调用
+src/xcgui_min.h	XEdit_GetText	-	读取编辑框全部文本
+src/xcgui_min.h	XEdit_SetText	-	设置编辑框全部文本（已弃用：会多插一个字符且直接写盘）
+src/xcgui_min.h	XEdit_SetCurPosEx	-	按行列移动光标
+src/xcgui_min.h	XWnd_GetHWND	-	XCGUI 窗口句柄转 Win32 HWND
+src/tools.cpp	doModuleList	scanAllModules	列出模块库模块并标注是否已加入工程
+src/tools.cpp	doModuleSearch	scanAllModules	按名称/文件/备注/作者打分搜索模块
+src/tools.cpp	doModuleAdd	writeProjectModuleItems	把模块写入 xcproj 的 modules 节点
+src/tools.cpp	doModuleRemove	writeProjectModuleItems	从 xcproj 移除模块
+src/tools.cpp	doModuleCreate	writeFileKeepEnc	生成 module_xxx.h/.cpp（UTF-8-BOM）并可选入工程
+src/tools.cpp	ensureDirW	CreateDirectoryW 逐段建目录（location=dev/main 时用）
+src/tools.cpp	scanAllModules	scanModuleDir	递归扫 XC-Module 与 XC-Module-dev
+src/tools.cpp	parseModuleHeader	-	解析模块头 //@ 注解（名称/版本/作者/备注）
+src/tools.cpp	readProjectModuleItems	-	读 xcproj 的 modules 列表
+src/tools.cpp	writeProjectModuleItems	-	重建 xcproj 的 modules 块
+src/tools.cpp	doReadFile	readFileUtf8	读文件，返回 size(去 BOM)/rawSize(含 BOM)/bom/crlf/content
+src/tools.cpp	doListProjects	scanProjectsRec	递归扫描 .xcproj（默认 depth=6）
+src/tools.cpp	scanProjectsRec	- 	递归遍历目录树，跳过 obj/bin/x64/Release 等目录
+src/tools.cpp	skipProjDirW	-	判断目录名是否属于应跳过的构建目录
+src/tools.cpp	parseModuleHeader	- 	解析模块头 //@模块名称/版本/作者/模块备注/依赖，BOM 剥离、依赖按 ,;空格\t" 拆分并跳过「无」
+src/tools.cpp	doModuleSearch	parseModuleHeader	按名称/文件/备注/作者/依赖打分；dependsOn 反查依赖关系（+200）
+src/tools.cpp	doModuleCreate	expandPlatformList	生成模块骨架，写 //@lib / //@复制文件 / //@包含目录，自动推导 x86 分支
+src/tools.cpp	expandPlatformList	- 	裸库名展开成 x64\\ 与 x86\\ 两条；extra 非空时改用 extra 作为 32 位列表
+src/tools.cpp	checkMissing	- 	检查库/dll/包含目录在模块目录下是否存在，缺失项进 missing[]
+src/tools.cpp	doModuleCreate.force	bool 参数	目标模块已存在时必须显式 true 才覆盖
+src/tools.cpp	GetFullPathNameW	Win32 API	规范化 dir 后断言模块库前缀，防目录穿越
+src/http.cpp	g_connCount	volatile LONG	连接线程计数，stop 时等其归零再 WSACleanup
+src/tools.cpp	ideRootDirW	静态函数	向上找 data 目录推导 IDE 根；失败返回空串，无字面量兜底
+src/http.cpp	loadOrCreateToken	rand_s + 文件	token 来源优先级 XC_MCP_TOKEN -> %LOCALAPPDATA%\xc-mcp\token -> 随机生成并写文件
+src/http.cpp	headerVal	原始头文本	大小写不敏感取头值，用于 Host/Origin/Content-Type/token 校验
+src/http.cpp	handleOne 校验链	-	Origin 403 -> Host 403 -> token 401 -> OPTIONS 204 -> Content-Type 415 -> 载荷 413
+src/mcp.cpp	sanitizeUtf8	逐码点校验	拒绝超长编码/代理区/越界/截断序列，非法替换 U+FFFD
+src/mcp.cpp	handle	batch 入口	顶层数组逐条转 handleOne；通知项跳过；空数组回 -32600
+src/tools.cpp	pathAllowed	GetFullPathNameW	读/写路径白名单：工程目录 + 两个模块库 + 插件目录；越界需 allowOutsideProject
+src/tools.cpp	ideWritableAt	VirtualQuery	写宿主内存前校验 PE 边界 + MEM_COMMIT + 可写保护
+src/tools.cpp	ideImageTag	IMAGE_NT_HEADERS64	返回 ts=时间戳,image=SizeOfImage 供调用方核对版本
+src/tools.cpp	xmlEsc	-	XML 属性值转义 & < > " '，用于 <modules> 的 path/name
+src/tools.cpp	xmlUnesc	-	反向还原 XML 实体，读 <modules> 时用
+src/tools.cpp	xmlAttr	-	从 <item ...> 原始行取指定属性值
+src/tools.cpp	doProbeCmd.confirm	string 参数	非白名单 cmd_id 需 allow_unsafe=true 且 confirm=I-UNDERSTAND-THE-RISK
+src/tools.cpp	doReadFile.allowOutsideProject	bool 参数	越出工程/模块库/插件目录时需显式 true
+src/tools.cpp	doEditorSet.allowOutsideProject	bool 参数	同上，写路径白名单
+src/http.cpp	SO_RCVTIMEO 排空	recv 循环	413/大 body 场景下先排空接收缓冲再 closesocket，避免客户端收 RST 10053

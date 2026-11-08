@@ -30,6 +30,7 @@ pushd "%OUT%"
   "%ROOT%\src\http.cpp" ^
   "%ROOT%\src\mcp.cpp" ^
   "%ROOT%\src\mcp_log.cpp" ^
+  "%ROOT%\src\dialogs.cpp" ^
   "%ROOT%\src\tools.cpp" ^
   /link /DLL /OUT:"%OUT%\plug_xcmcp.dll" ^
   /LIBPATH:"%VC%\lib\x64" ^

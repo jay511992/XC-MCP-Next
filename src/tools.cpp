@@ -3,6 +3,7 @@
 #include "xcgui_min.h"
 #include "http.hpp"
 #include "mcp_log.hpp"
+#include "dialogs.hpp"
 
 #include <windows.h>
 #include <string>
@@ -248,6 +249,8 @@ js::Value list() {
          "{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\",\"enum\":[\"compile\",\"recompile\",\"compile_all\"]},\"menu_id\":{\"type\":\"integer\"}}}"},
         {"xc_get_output", "调试输出窗格",
          "{\"type\":\"object\",\"properties\":{\"tailLines\":{\"type\":\"integer\"},\"clear\":{\"type\":\"boolean\"},\"maxChars\":{\"type\":\"integer\"}}}"},
+        {"xc_get_dialogs", "当前错误提示弹窗;只读,无历史",
+         "{\"type\":\"object\",\"properties\":{\"maxChars\":{\"type\":\"integer\",\"default\":16000,\"minimum\":128,\"maximum\":65536}},\"additionalProperties\":false}"},
         {"xc_save_all", "", "{\"type\":\"object\"}"},
         {"xc_read_file", "读文本;限工程目录",
          "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"allowOutsideProject\":{\"type\":\"boolean\"}},\"required\":[\"path\"]}"},
@@ -309,7 +312,7 @@ js::Value list() {
 
 namespace {
 // tools/list 的定义是编译期常量，序列化结果永不变更：
-// 这里只构建一次并缓存原始 JSON 文本，后续请求直接内联（省掉 29 段 schema 的重复解析与序列化）。
+// 这里只构建一次并缓存原始 JSON 文本，后续请求直接内联（省掉各工具 schema 的重复解析与序列化）。
 struct ListCache {
     SRWLOCK     lock;   // SRWLOCK_INIT 是常量初始化，无需额外 init
     bool        inited;
@@ -2718,6 +2721,11 @@ static std::string callImpl(const std::string& name, const js::Value& args, bool
     if (name == "xc_reset_parse_count") return doResetParse();
     if (name == "xc_ide_log") return doIdeLog(args);
     if (name == "xc_get_output") return doGetOutput(args);
+    if (name == "xc_get_dialogs") {
+        js::Value result = dialogs::read(args);
+        isError = !result.find("ok")->asBool();
+        return result.dump();
+    }
     if (name == "xc_read_file") return doReadFile(args);
     if (name == "xc_list_projects") return doListProjects(args);
     if (name == "xc_server") {

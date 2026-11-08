@@ -236,7 +236,7 @@ class LiveTests(unittest.TestCase):
         self.assertEqual(len(rows), 3)
         self.assertEqual(rows[0]["result"]["serverInfo"]["name"], "xcide-mcp")
         self.assertEqual(len(rows[1]), 1)
-        self.assertEqual(len(rows[2]["result"]["tools"]), 29)
+        self.assertEqual(len(rows[2]["result"]["tools"]), 30)
 
 
 if __name__ == "__main__":

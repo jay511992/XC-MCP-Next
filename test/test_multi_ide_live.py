@@ -156,12 +156,15 @@ class Acceptance:
             assert init["protocolVersion"] == "2024-11-05"
             assert target.post({"jsonrpc": "2.0", "method": "notifications/initialized"}) == ""
             listing = rpc(target, "tools/list")["tools"]
-            assert len(listing) == 29
+            assert len(listing) == 30
             schema = {t["name"]: t["inputSchema"] for t in listing}
             schemas.append(schema)
             if baseline is not None:
-                assert schema == {t["name"]: t["inputSchema"] for t in baseline}
+                legacy = {t["name"]: t["inputSchema"] for t in baseline}
+                assert all(schema.get(name) == params for name, params in legacy.items())
+                assert (set(schema) - set(legacy)) <= {"xc_get_dialogs"}
             status = tool(target, "xc_status")
+            assert status["toolCount"] == 30
             assert status["pid"] == target.info["pid"]
             assert status["port"] == target.info["port"]
             assert status["instanceId"] == target.instance_id
@@ -180,7 +183,7 @@ class Acceptance:
             other = self.targets["B" if name == "A" else "A"]
             assert self.raw(target, headers={"X-XC-Project": quote(other.project, safe="")})[0] == 409
         assert schemas[0] == schemas[1]
-        self.check("protocol_29_tools_parameters_and_file_reads", detail="initialize / notification / 29 schemas / status / project / BOM+CRLF")
+        self.check("protocol_30_tools_parameters_and_file_reads", detail="initialize / notification / 30 schemas / status / project / BOM+CRLF")
         self.check("token_optional_and_target_guards_on_both_instances",
                    detail="200 without/with bad token; 403 Host/Origin; 409 wrong instance/project")
         found = instances.discover(self.directory)

@@ -3,6 +3,7 @@
 #include "mcp.hpp"
 #include "mcp_log.hpp"
 #include "tools.hpp"
+#include "dialogs.hpp"
 
 #include <windows.h>
 #include <string>
@@ -68,6 +69,7 @@ DWORD WINAPI bootThread(LPVOID) {
 BOOL initEntry(void* funSet, HWND hMainFrame, int ver, int rsv, const wchar_t* entry) {
     xi::g_funSet     = (xi::FunSet)funSet;
     xi::g_hMainFrame = hMainFrame;
+    dialogs::install();
     mcp_log::install();
     xi::g_ver        = ver;
     xi::logLine(L"==== %s funSet=%p hMain=%p ver=%d rsv=%d ====",
@@ -87,6 +89,7 @@ extern "C" __declspec(dllexport) BOOL OnPlugInit(void* funSet, HWND hMainFrame, 
 }
 
 extern "C" __declspec(dllexport) BOOL OnExitPlug() {
+    dialogs::shutdown();
     mcp_log::shutdown();
     http::stop();
     xi::logLine(L"OnExitPlug");
@@ -94,6 +97,7 @@ extern "C" __declspec(dllexport) BOOL OnExitPlug() {
 }
 
 extern "C" __declspec(dllexport) BOOL OnPlugExit() {
+    dialogs::shutdown();
     mcp_log::shutdown();
     http::stop();
     xi::logLine(L"OnPlugExit");

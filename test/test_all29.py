@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""XC-MCP-Next 29 工具回归（只读 + 模块链路，不改动主工程源码）。"""
+"""XC-MCP-Next 30 工具回归（保留历史文件名；含业务路径，勿直接用于隔离验收）。"""
 import io, json, os, sys, urllib.request
 def _read_token():
     import os as _os
@@ -83,16 +83,16 @@ def main():
     check("initialize", init["result"]["serverInfo"]["name"] == "xcide-mcp")
     tl = rpc("tools/list")
     names = [t["name"] for t in tl["result"]["tools"]]
-    check("tools/list==29", len(names) == 29, "(%d)" % len(names))
+    check("tools/list==30", len(names) == 30, "(%d)" % len(names))
     for n in ("xc_module_list", "xc_module_search", "xc_module_add",
-              "xc_module_remove", "xc_module_create"):
+              "xc_module_remove", "xc_module_create", "xc_get_dialogs"):
         check("has " + n, n in names)
     for n in ("xc_ide_window", "xc_build_sync", "xc_debug_run", "xc_debug_dump"):
         check("removed " + n, n not in names)
 
     print("== 2. 状态与工程 ==")
     v, e = tool("xc_status")
-    check("xc_status", (not e) and v.get("toolCount") == 29 and v.get("httpRunning"),
+    check("xc_status", (not e) and v.get("toolCount") == 30 and v.get("httpRunning"),
           "toolCount=%s ver=%s" % (v.get("toolCount"), v.get("ver")))
     v, e = tool("xc_get_project")
     check("xc_get_project", (not e) and v.get("dir") == PROJ, str(v.get("dir"))[:60])

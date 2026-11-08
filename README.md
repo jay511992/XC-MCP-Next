@@ -1,11 +1,11 @@
 # XC-MCP-Next
 
-炫彩IDE 插件，对齐原 `plug_mcp.dll`（471,040 B，无源码）的 24 个 `xc_*` MCP 工具，并扩展至 **29 个**（新增 5 个模块管理工具，让 AI 能自己发现/加入/新建模块）。
+炫彩IDE 插件，对齐原 `plug_mcp.dll`（471,040 B，无源码）的 24 个 `xc_*` MCP 工具，并扩展至 **30 个**（5 个模块管理工具 + 只读错误弹窗工具 `xc_get_dialogs`）。
 本工程通过实证逆向 IDE 插件 ABI 后从零实现。
 
 ## 多 IDE 实例（1.2.0）
 
-支持多个 IDE 进程分别对接客户端：独立端口、实例发现、按工程完整路径或实例 ID 绑定，HTTP 与 stdio 均可用，29 个工具及既有参数保持兼容。
+支持多个 IDE 进程分别对接客户端：独立端口、实例发现、按工程完整路径或实例 ID 绑定，HTTP 与 stdio 均可用；原 29 个工具及既有参数保持兼容，当前新增 `xc_get_dialogs`，共 30 个。
 
 本机 HTTP **不要求 token 认证**。客户端可直接连接发现到的 `url`；旧 `X-XC-Token`、`Authorization` 头和 `tokenFile` 仅为兼容保留，服务器不校验。Host、Origin、实例 ID 与工程保护仍然生效。
 
@@ -15,6 +15,14 @@ python -I -B wait_ready.py 40 --project 'C:\work\项目A\项目A.xcproj'
 ```
 
 多实例时不再猜测 18766 或选择列表第一项。完整配置与生命周期说明见 [多实例接入指南](doc/MULTI_INSTANCE.md)，本轮实测见 [验收记录](doc/MULTI_INSTANCE_VERIFICATION.md)。下面保留的 18766 配置是单实例兼容示例；全局 mcp-cli/客户端配置不会自动被本项目改写。
+
+## 当前错误提示弹窗（新增）
+
+`xc_get_dialogs` 读取当前连接的 IDE 中**仍打开的提示／错误消息框标题和正文**，支持原生 Windows 消息框及炫彩自绘模态提示框。它与读取输出面板的 `xc_get_output` 独立；不记录历史、不点击或关闭窗口，不自动判断错误等级。
+
+参数 `maxChars` 默认 16000（128..65536）；返回 `ok`、`complete`、`count`、`dialogs[{hwnd,pid,title,text,source,readable,truncated}]` 和 `errors`。UI 不响应、正文不可读或窗口在读取时消失，均明确返回诊断，不能把失败当成“没有弹窗”。接口细节与隔离验证见 [弹窗读取说明](doc/DIALOGS.md)。
+
+本次只构建项目产物，不更新已部署插件或重启现有 IDE；旧插件在使用者自行更新前可能仍列出 29 个工具。
 
 ## 怎么调用（已验证的两种方式）
 
@@ -26,7 +34,7 @@ python -I -B wait_ready.py 40 --project 'C:\work\项目A\项目A.xcproj'
 ```bash
 MCP="G:/AItools/skill/_融合后/mcp-cli/scripts/mcp.py"
 
-python "$MCP" ping xc_ide              # OK:29 tools
+python "$MCP" ping xc_ide              # 更新到当前构建后：OK:30 tools
 python "$MCP" list xc_ide              # 列出全部工具
 python "$MCP" call xc_ide xc_get_project
 python "$MCP" call xc_ide xc_symbol name=取宿主路径
@@ -66,7 +74,7 @@ python I:\xcide\xc-plugin\XC-MCP-Next\wait_ready.py
 
 ## 状态
 
-**29 个工具全部实现并端到端验证通过**（2026-11-02 第四轮；模块链路已用真实工程编译验证）。
+**原 29 个工具的既往端到端验收记录保留**（2026-11-02 第四轮；模块链路已用真实工程编译验证）。当前工具清单为 30 个，新增弹窗工具的接口与隔离验证方式见 [弹窗读取说明](doc/DIALOGS.md)。
 
 | 工具 | 状态 | 实现方式 |
 |---|---|---|
@@ -79,6 +87,7 @@ python I:\xcide\xc-plugin\XC-MCP-Next\wait_ready.py
 | `xc_build` | ✅ | PostMessage F7 → 实测编译成功 |
 | `xc_menu_cmd` | ✅ | PostMessage F7 / Ctrl+F5 |
 | `xc_get_output` | ✅ | getHELE(1101) + XEdit_GetText |
+| `xc_get_dialogs` | 新增 | 当前进程可见消息框 + UI 线程快照；原生文本 / 通用炫彩节点 / 受版本校验的 XMsg 原文 |
 | `xc_read_file` | ✅ | 文件 IO；返回 `size`(去 BOM)/`rawSize`(含 BOM)/`bom`/`crlf` |
 | `xc_editor_get` | ✅ | ABI type 16 取 hEle + XEdit_GetText |
 | `xc_editor_set` | ✅ | 直接写盘，保持 BOM/CRLF（**不用 XEdit_SetText**） |
@@ -104,6 +113,7 @@ python I:\xcide\xc-plugin\XC-MCP-Next\wait_ready.py
 
 | 工具 | 关键参数 | 返回重点 |
 |---|---|---|
+| `xc_get_dialogs` | `maxChars`（默认 16000，128..65536） | `ok` / `complete` / `count` / `dialogs[]` / `errors[]`；只读当前弹窗，不保存历史 |
 | `xc_read_file` | `path` | `size` = 去 BOM 后字节数；`rawSize` = 磁盘原始字节数（含 3 字节 BOM）；`bom` / `crlf` 供写回时保持原格式 |
 | `xc_list_projects` | `root` / `depth`(默认 6，上限 12) | `count` / `dirsScanned` / `projects[{dir, project_file}]` |
 | `xc_module_info` | `path`(全路径) 或 `name`(裸文件名 如 `module_base.h`) | `path`/`file`/`module`/`author`/`version`/`date`/`remark`/`extra`(MD5) |
@@ -122,7 +132,8 @@ python I:\xcide\xc-plugin\XC-MCP-Next\wait_ready.py
 | `bridge/instances.py` | 共享发现、目标校验及实例枚举 CLI |
 | `src/mcp.cpp` | JSON-RPC 2.0 协议层 |
 | `src/json.cpp` | 手写 JSON |
-| `src/tools.cpp` | 29 工具实现 |
+| `src/tools.cpp` | 30 个工具的注册与实现入口 |
+| `src/dialogs.hpp` / `.cpp` | 只读弹窗发现、UI 线程读取与有界失败诊断 |
 | `src/xcgui_min.h` | 用到的 XCGUI 导入声明 |
 | `lib/XCGUI.lib` | x64 导入库（取自 IDE 自带模块） |
 | `doc/abi.md` | ABI 逆向实证记录 |
@@ -170,7 +181,7 @@ Claude Desktop / Cursor 等只吃 stdio 的客户端，用 `bridge/stdio_bridge.
 }
 ```
 
-桥接已实测：`initialize` / `tools/list`（29 个工具）/ `tools/call` 三项全通。
+桥接支持 `initialize` / `tools/list` / `tools/call`，当前构建返回 30 个工具；原 29 个工具的既往实机验收记录不变，新增弹窗接口通过同一桥接链路访问。
 桥接可读取旧 token 文件作兼容，但服务器不要求 token；不带 token 也能直接连接。
 首次请求后固定绑定实例。IDE 重启/目标失效后需重新建立 MCP 连接，不自动改连别的 IDE；按工程选择时，工程切换会被拒绝。
 没有实例或匹配不唯一时返回明确错误，请用 `--project` / `--instance` 选择。
@@ -203,6 +214,7 @@ build.bat
 验证：
 
 ```
+python -I -B test\test_dialogs.py
 python -I -B test\test_opt2.py --offline
 python -I -B test\test_instances.py
 python -I -B test\test_native_transport.py
@@ -461,3 +473,4 @@ HTTP 帧在进入请求处理前检查：头部过大返回 431，错误/重复 
 - 解析计数器偏移 `+0x4B83EC` 是 3.3.9 硬编码值，换版本会失效（写前有 PE 边界 + `VirtualQuery` 门禁，不匹配时拒绝写入而不是崩）。
 - 旧 token 头、显式 `XC_MCP_URL` / `XC_MCP_TOKEN` 可继续提交但被忽略；多实例请更新连接选择器。本项目不自动修改全局 MCP 配置。
 - JSON-RPC 的 **batch 请求**已支持（顶层数组，逐条处理，通知项跳过不产出响应）；孤立代理字符在响应文本里会被替换成 U+FFFD，保证输出是合法 UTF-8。
+- `xc_get_dialogs` 只读当前可见提示框；其他 UI 线程、正文不可读或快照受限时返回明确诊断，不做历史／OCR，详情见 [弹窗读取说明](doc/DIALOGS.md)。
